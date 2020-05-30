@@ -15,8 +15,8 @@ data[is.na(data)] <- 0
 data2 <- data %>% gather(yrmon, Ticker, X1932:X338444) %>% ungroup()
 colnames(data2) <- c('Date', 'Ticker', 'Ret')
 data2 <- data2 %>% mutate(yrmon=as.yearmon(data2$Date))
-data3 <- data2 %>% group_by(Ticker, yrmon) %>% summarise(Return_max=max(Ret, na.rm=TRUE)) %>% drop_na()
-data3 <- data3 %>% group_by(yrmon) %>% mutate(decile=ntile(Return_max, 100))
+data3 <- data2 %>% group_by(Ticker, yrmon) %>% summarise(Return_min=min(Ret, na.rm=TRUE)) %>% drop_na()
+data3 <- data3 %>% group_by(yrmon) %>% mutate(decile=ntile(Return_min, 100))
 data3$lagDecile <- lag(data3$decile)
 data4 <- data3
 cumRet <- data2 %>% group_by(Ticker, yrmon) %>% summarise(MonRet=sum(Ret))
@@ -26,13 +26,13 @@ data4 <- data4 %>% group_by(Ticker) %>% arrange(Ticker,yrmon) %>% drop_na()
 data4 <- data4 %>% group_by(Ticker) %>% slice(-1) %>% drop_na()
 data4 <- data4 %>% group_by(lagDecile, yrmon) %>% summarise(DecRet = mean(MonRet))
 
-plot(data4$yrmon[data4$lagDecile==1], cumsum(100*data4$DecRet[data4$lagDecile==1]), type='l')
+plot(data4$yrmon[data4$lagDecile==1], cumsum(100*data4$DecRet[data4$lagDecile==100]), type='l')
 for(i in 2:10){
-  lines(data4$yrmon[data4$lagDecile==i], cumsum(100*data4$DecRet[data4$lagDecile==i]))
+  lines(data4$yrmon[data4$lagDecile==i], cumsum(100*data4$DecRet[data4$lagDecile==100-i]))
 }
 
-# Long worst max and short best max 
-firstPort <- data4$DecRet[data4$lagDecile==1] - data4$DecRet[data4$lagDecile==100]
+# Long worst min and short best min 
+firstPort <- data4$DecRet[data4$lagDecile==100] - data4$DecRet[data4$lagDecile==1]
 mean(firstPort)
 firstPort <- data.frame(unique(data4$yrmon), firstPort)
 colnames(firstPort) <- c('yrmon', 'PortRet')
@@ -42,26 +42,20 @@ plot(firstPort$yrmon, firstPort$CumRet, type='l')
 # Mean annual return 
 mean(1200*firstPort$PortRet)
 
-plot(data4$yrmon[data4$lagDecile==100], cumsum(data4$DecRet[data4$lagDecile==100]), type='l')
-lines(data4$yrmon[data4$lagDecile==1], cumsum(data4$DecRet[data4$lagDecile==1]))
+plot(data4$yrmon[data4$lagDecile==1], cumsum(data4$DecRet[data4$lagDecile==1]), type='l')
+lines(data4$yrmon[data4$lagDecile==100], cumsum(data4$DecRet[data4$lagDecile==100]))
 
 plot(firstPort$yrmon, log(1+firstPort$CumRet, base = 10), type='l')
-plot(firstPort$yrmon, firstPort$CumRet, type='l')
+plot(firstPort$yrmon, -firstPort$CumRet, type='l')
 
 thisMonth <- data3[data3$yrmon == max(data3$yrmon), ]
 thisMonth$Ticker <- as.numeric(substring(thisMonth$Ticker, 2))
-thisMonth <- thisMonth[thisMonth$lagDecile == 100, ]
-plot(data4$yrmon[data4$lagDecile==100], -cumsum(data4$DecRet[data4$lagDecile==100]), type='l')
+thisMonth <- thisMonth[thisMonth$lagDecile == 1, ]
+plot(data4$yrmon[data4$lagDecile==1], cumsum(data4$DecRet[data4$lagDecile==1]), type='l')
 
 compInfo <- read.csv('compInfo.csv')[,-1]
 thisMonth <- merge(thisMonth, compInfo, by.x = "Ticker", by.y = "gvkey")
-
-lotteryMax <- firstPort
-plot(lotteryMax$yrmon, lotteryMax$CumRet+lotteryMin$CumRet, type='l')
-plot(lotteryMax$yrmon, lotteryMax$CumRet-lotteryMin$CumRet, type='l')
-lottery <- lotteryMax
-lottery[,2:3] <- lotteryMax[,2:3] + lotteryMin[,2:3]
-plot(lottery$yrmon, lottery$CumRet, type='l')
+lotteryMin <- firstPort
 
 # monthReturn <- monthReturn %>% mutate(yrmon=as.yearmon(monthReturn$StartH))
 # combRet <- merge(monthReturn, firstPort, by = "yrmon") %>% arrange(yrmon)
